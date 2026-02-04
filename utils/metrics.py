@@ -174,6 +174,35 @@ def LogWMSE_metric(
     return float(res.cpu().numpy())
 
 
+def MultiL1SNRDB_metric(
+        reference: np.ndarray,
+        estimate: np.ndarray,
+        device: str = 'cpu',
+) -> float:
+    """
+    Calculate L1-SNR metric (higher is better).
+    Returns negative loss value for scheduler compatibility (mode='max').
+    """
+    from torch_l1_snr import MultiL1SNRDBLoss
+
+    l1_snr = MultiL1SNRDBLoss(
+        name="l1_snr_metric",
+        weight=1.0,
+        spec_weight=0.5,
+        l1_weight=0.0,
+        use_time_regularization=True,
+        use_spec_regularization=False,
+    )
+
+    reference_t = torch.from_numpy(reference).unsqueeze(0).to(device)
+    estimate_t = torch.from_numpy(estimate).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        res = l1_snr(estimate_t, reference_t)
+
+    return -float(res.cpu().numpy())
+
+
 def AuraSTFT_metric(
         reference: np.ndarray,
         estimate: np.ndarray,
@@ -418,6 +447,9 @@ def get_metrics(
 
     if 'aura_mrstft' in metrics:
         result['aura_mrstft'] = AuraMRSTFT_metric(reference, estimate, device)
+
+    if 'l1_snr' in metrics:
+        result['l1_snr'] = MultiL1SNRDB_metric(reference, estimate, device)
 
     if 'bleedless' in metrics or 'fullness' in metrics:
         bleedless, fullness = bleed_full(reference, estimate, device=device)

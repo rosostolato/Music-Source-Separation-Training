@@ -62,7 +62,8 @@ def parse_args_train(dict_args: Union[argparse.Namespace, Dict, None]) -> argpar
     parser.add_argument("--device_ids", nargs='+', type=int, default=[0], help='list of gpu ids')
     parser.add_argument("--loss", type=str, nargs='+', choices=['masked_loss', 'mse_loss', 'l1_loss',
                                                                 'multistft_loss', 'spec_masked_loss', 'spec_rmse_loss',
-                                                                'log_wmse_loss'],
+                                                                'log_wmse_loss', 'l1_snr_loss', 'l1_snr_db_loss',
+                                                                'stft_l1_snr_db_loss', 'multi_l1_snr_db_loss'],
                         default=['masked_loss'], help="List of loss functions to use")
     parser.add_argument("--masked_loss_coef", type=float, default=1., help="Coef for loss")
     parser.add_argument("--mse_loss_coef", type=float, default=1., help="Coef for loss")
@@ -71,15 +72,19 @@ def parse_args_train(dict_args: Union[argparse.Namespace, Dict, None]) -> argpar
     parser.add_argument("--multistft_loss_coef", type=float, default=0.001, help="Coef for loss")
     parser.add_argument("--spec_masked_loss_coef", type=float, default=1, help="Coef for loss")
     parser.add_argument("--spec_rmse_loss_coef", type=float, default=1, help="Coef for loss")
+    parser.add_argument("--l1_snr_loss_coef", type=float, default=1., help="Coef for L1-SNR loss")
+    parser.add_argument("--l1_snr_db_loss_coef", type=float, default=1., help="Coef for L1-SNR-DB loss")
+    parser.add_argument("--stft_l1_snr_db_loss_coef", type=float, default=1., help="Coef for STFT-L1-SNR-DB loss")
+    parser.add_argument("--multi_l1_snr_db_loss_coef", type=float, default=1., help="Coef for Multi-L1-SNR-DB loss")
     parser.add_argument("--wandb_key", type=str, default='', help='wandb API Key')
     parser.add_argument("--wandb_offline", action='store_true', help='local wandb')
     parser.add_argument("--pre_valid", action='store_true', help='Run validation before training')
     parser.add_argument("--metrics", nargs='+', type=str, default=["sdr"],
                         choices=['k_sdr', 'sdr', 'l1_freq', 'si_sdr', 'log_wmse', 'aura_stft', 'aura_mrstft', 'bleedless',
-                                 'fullness'], help='List of metrics to use.')
+                                 'fullness', 'l1_snr'], help='List of metrics to use.')
     parser.add_argument("--metric_for_scheduler", default="sdr",
                         choices=['k_sdr','sdr', 'l1_freq', 'si_sdr', 'log_wmse', 'aura_stft', 'aura_mrstft', 'bleedless',
-                                 'fullness'], help='Metric which will be used for scheduler.')
+                                 'fullness', 'l1_snr'], help='Metric which will be used for scheduler.')
     parser.add_argument("--train_lora_peft", action='store_true', help="Training with LoRA from peft")
     parser.add_argument("--train_lora_loralib", action='store_true', help="Training with LoRA from loralib")
     parser.add_argument("--lora_checkpoint_peft", type=str, default='', help="Initial checkpoint to LoRA weights")
@@ -158,7 +163,7 @@ def parse_args_valid(dict_args: Union[Dict, None]) -> argparse.Namespace:
                              "While this triples the runtime, it reduces noise and slightly improves prediction quality.")
     parser.add_argument("--metrics", nargs='+', type=str, default=["sdr"],
                         choices=['k_sdr', 'sdr', 'l1_freq', 'si_sdr', 'neg_log_wmse', 'aura_stft', 'aura_mrstft', 'bleedless',
-                                 'fullness'], help='List of metrics to use.')
+                                 'fullness', 'l1_snr'], help='List of metrics to use.')
     parser.add_argument("--lora_checkpoint_peft", type=str, default='', help="Initial checkpoint to LoRA weights")
     parser.add_argument("--lora_checkpoint_loralib", type=str, default='', help="Initial checkpoint to LoRA weights")
 
