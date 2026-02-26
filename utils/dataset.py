@@ -275,11 +275,13 @@ class MSSDataset(torch.utils.data.Dataset):
         if self.aug:
             if 'loudness' in self.config['augmentations']:
                 if self.config['augmentations']['loudness']:
-                    loud_values = np.random.uniform(
-                        low=self.config['augmentations']['loudness_min'],
-                        high=self.config['augmentations']['loudness_max'],
-                        size=(len(res),)
-                    )
+                    # Per-stem loudness ranges (falls back to global range)
+                    loud_values = np.empty(len(res))
+                    for i, instr in enumerate(self.config['training']['instruments']):
+                        instr_aug = self.config['augmentations'].get(instr, {})
+                        lo = instr_aug.get('loudness_min', self.config['augmentations']['loudness_min'])
+                        hi = instr_aug.get('loudness_max', self.config['augmentations']['loudness_max'])
+                        loud_values[i] = np.random.uniform(low=lo, high=hi)
                     loud_values = torch.tensor(loud_values, dtype=torch.float32)
                     res *= loud_values[:, None, None]
         if self.dataset_type != 6 and self.dataset_type!=7:

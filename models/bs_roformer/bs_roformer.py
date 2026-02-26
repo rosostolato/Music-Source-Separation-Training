@@ -397,6 +397,7 @@ class BSRoformer(Module):
             use_torch_checkpoint=False,
             skip_connection=False,
             use_pope: bool = False,
+            stem_weights=None,  # Per-stem loss weights, e.g. [5.0, 1.0]
     ):
         super().__init__()
 
@@ -405,6 +406,7 @@ class BSRoformer(Module):
         self.num_stems = num_stems
         self.use_torch_checkpoint = use_torch_checkpoint
         self.skip_connection = skip_connection
+        self.stem_weights = stem_weights
 
         self.layers = ModuleList([])
 
@@ -674,7 +676,16 @@ class BSRoformer(Module):
         target = target[..., :recon_audio.shape[-1]]  # protect against lost length on istft
 
         target_sel = target[:, stem_ids]
-        loss = F.l1_loss(recon_audio, target_sel)
+
+        # Per-stem weighted L1 loss
+        if self.stem_weights is not None:
+            w = torch.tensor(self.stem_weights, device=device, dtype=recon_audio.dtype)
+            w = w[:num_stems]
+            diff = torch.abs(recon_audio - target_sel)  # (B, N, C, T)
+            per_stem = diff.mean(dim=(0, 2, 3))          # (N,)
+            loss = (per_stem * w).sum() / w.sum()
+        else:
+            loss = F.l1_loss(recon_audio, target_sel)
 
         multi_stft_resolution_loss = 0.
 
@@ -687,10 +698,20 @@ class BSRoformer(Module):
                 **self.multi_stft_kwargs,
             )
 
-            recon_Y = torch.stft(rearrange(recon_audio, 'b n s t -> (b n s) t'),**res_stft_kwargs)
-            target_Y = torch.stft(rearrange(target_sel, 'b n s t -> (b n s) t'),**res_stft_kwargs)
-
-            multi_stft_resolution_loss = multi_stft_resolution_loss + F.l1_loss(recon_Y, target_Y)
+            # Per-stem weighted STFT L1 loss
+            if self.stem_weights is not None:
+                w = torch.tensor(self.stem_weights, device=device, dtype=recon_audio.dtype)
+                w = w[:num_stems]
+                window_loss = 0.
+                for i in range(num_stems):
+                    recon_Y = torch.stft(rearrange(recon_audio[:, i], 'b s t -> (b s) t'), **res_stft_kwargs)
+                    target_Y = torch.stft(rearrange(target_sel[:, i], 'b s t -> (b s) t'), **res_stft_kwargs)
+                    window_loss = window_loss + F.l1_loss(recon_Y, target_Y) * w[i]
+                multi_stft_resolution_loss = multi_stft_resolution_loss + window_loss / w.sum()
+            else:
+                recon_Y = torch.stft(rearrange(recon_audio, 'b n s t -> (b n s) t'), **res_stft_kwargs)
+                target_Y = torch.stft(rearrange(target_sel, 'b n s t -> (b n s) t'), **res_stft_kwargs)
+                multi_stft_resolution_loss = multi_stft_resolution_loss + F.l1_loss(recon_Y, target_Y)
 
         weighted_multi_resolution_loss = multi_stft_resolution_loss * self.multi_stft_resolution_loss_weight
 
